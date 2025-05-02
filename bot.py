@@ -4,7 +4,7 @@ from aiogram.utils import executor
 import aiosqlite
 import datetime
 
-API_TOKEN = "PASTE_YOUR_API_TOKEN_HERE"
+API_TOKEN = "7887971695:AAGFMEdwQmWpXZyjlmXHLWZa6qMUHso9NbY"
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
