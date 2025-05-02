@@ -1,6 +1,6 @@
 import logging
 from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
+from aiogram.utils import asyncio
 import aiosqlite
 import datetime
 
@@ -111,4 +111,8 @@ async def on_startup(dp):
     await setup_db()
 
 if __name__ == "__main__":
-    executor.start_polling(dp, on_startup=on_startup)
+    async def main():
+        await setup_db()
+        await dp.start_polling(bot)
+
+    asyncio.run(main())
