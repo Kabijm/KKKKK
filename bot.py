@@ -1,8 +1,9 @@
 import logging
 from aiogram import Bot, Dispatcher, types
-import asyncio
+from aiogram.utils import executor
 import aiosqlite
 import datetime
+import re
 
 API_TOKEN = "7887971695:AAGFMEdwQmWpXZyjlmXHLWZa6qMUHso9NbY"
 
@@ -25,6 +26,10 @@ async def setup_db():
     )
     """)
     await db.commit()
+
+async def is_free(uid):
+    await cursor.execute("SELECT * FROM actions WHERE user_id=? AND action='free_given'", (uid,))
+    return await cursor.fetchone() is not None
 
 def is_admin(uid):
     return uid in admins
@@ -54,7 +59,7 @@ async def set_rules(message: types.Message):
     rules_text = message.get_args()
     await message.reply("✅ Правила обновлены.")
 
-@dp.message_handler(lambda msg: msg.text.lower() in ["/free", "free", "фри"])
+@dp.message_handler(lambda msg: msg.text and msg.text.lower() in ["/free", "free", "фри"])
 async def toggle_free(message: types.Message):
     if not is_admin(message.from_user.id):
         return
@@ -96,23 +101,42 @@ async def user_info(msg: types.Message):
     last_action = await cursor.fetchone()
     last_action_str = f"{last_action[0]} в {last_action[1]}" if last_action else "Нет"
     await cursor.execute("SELECT action FROM actions WHERE user_id = ? AND action='free_given'", (uid,))
-    is_free = await cursor.fetchone() is not None
+    is_free_status = await cursor.fetchone() is not None
 
     await msg.reply(
         f"📊 Информация о пользователе <b>{target_user.full_name}</b> [<code>{uid}</code>]:\n"
         f"🔹 Варны: <b>{warn_count}</b>\n"
         f"🔸 Муты: <b>{mute_count}</b>\n"
-        f"💠 Free: {'✅' if is_free else '❌'}\n"
+        f"💠 Free: {'✅' if is_free_status else '❌'}\n"
         f"🕓 Последнее действие: <b>{last_action_str}</b>",
         parse_mode="HTML"
     )
 
+@dp.message_handler(content_types=types.ContentType.ANY)
+async def filter_media(message: types.Message):
+    if is_admin(message.from_user.id):
+        return
+    if await is_free(message.from_user.id):
+        return
+    if message.content_type in [
+        types.ContentType.PHOTO,
+        types.ContentType.VIDEO,
+        types.ContentType.DOCUMENT,
+        types.ContentType.STICKER,
+        types.ContentType.VOICE,
+        types.ContentType.VIDEO_NOTE,
+        types.ContentType.ANIMATION
+    ]:
+        await message.delete()
+        return
+    if message.text and re.search(r"https?://", message.text):
+        await message.delete()
+        return
+
 async def on_startup(dp):
     await setup_db()
+    # Добавим главного админа по ID
+    admins.add(1975696715)
 
 if __name__ == "__main__":
-    async def main():
-        await setup_db()
-        await dp.start_polling(bot)
-
-    asyncio.run(main())
+    executor.start_polling(dp, on_startup=on_startup)
